@@ -24,12 +24,14 @@ return [
         // 填你对外服务的那个绝对 origin, 结尾不带斜杠, 例如: https://gh.example.com
         'base_origin' => '',
 
-        // 【建议改】仓库地址与联系方式, 出现在错误页 / problem+json 与首页页脚。
-        'repo_url'    => '',
+        // 【建议改】上游项目地址与联系方式。repo_url 的实际用途是拼进发往 GitHub 的 UA
+        // 作为出处标识(见 Transport\Headers::userAgent), 派生/fork 应改成自己的仓库地址。
+        'repo_url'    => 'https://github.com/XINYUCloud/ghaccel',
         'contact'     => '',
 
         // 【可选】面向 GitHub 的匿名 UA。API 有速率限制且要求可识别来源, 不要伪装成浏览器。
-        'user_agent'  => 'GhAccel/1.0 (+https://github.com; contact=)',
+        // 留空时自动组合成 GhAccel/<版本> (+repo_url; contact=…), 版本号跟随 Bootstrap::VERSION。
+        'user_agent'  => '',
 
         // 【定位】private = 自用/私有部署(默认, EDGE 保守、面板不公网)。public 会额外注入
         // CORS, 并把下载当作对外服务对待 —— 公开开放前请先读 SECURITY.md 的合规与 ToS 章节。

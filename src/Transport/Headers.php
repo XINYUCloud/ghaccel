@@ -16,6 +16,7 @@ declare(strict_types=1);
 
 namespace GhAccel\Transport;
 
+use GhAccel\Bootstrap;
 use GhAccel\Cache\Policy;
 use GhAccel\Config;
 use GhAccel\Enum\Scene;
@@ -193,8 +194,7 @@ final class Headers
             $lines[] = self::restoreCase($name) . ': ' . self::sanitize($value);
         }
 
-        $ua = self::sanitize($this->cfg->str('app.user_agent', 'GhAccel/1.0'));
-        $lines[] = 'User-Agent: ' . ($ua === '' ? 'GhAccel/1.0' : $ua);
+        $lines[] = 'User-Agent: ' . self::sanitize($this->userAgent());
         // 一律 identity, 连 API 场景也不 gzip: 本机没有解压(不设 CURLOPT_ENCODING), 若上游
         // 回了 gzip 而我们的白名单/长度对账按明文写, 就会出现"头说明白、体是压缩"的错位。
         // 让字节与头自始至终是同一份东西, 比省几十 KB 重要(zstd/brotli 透传在 v2 再谈)。
@@ -231,6 +231,40 @@ final class Headers
             static fn (string $p): string => $p === '' ? '' : strtoupper($p[0]) . substr($p, 1),
             explode('-', $lower)
         ));
+    }
+
+    /**
+     * 发往 GitHub / 镜像的 User-Agent。
+     *
+     * app.user_agent 非空时按显式值原样使用(部署者可能要伪装成自家产品名); 为空时由
+     * app.repo_url 与 app.contact 现组合。之所以不直接把 URL 抄进 user_agent 默认值:
+     * 同一个地址写在两处必然漂移, 而漂移后的产物就是原先那句半截的
+     * "GhAccel/1.0 (+https://github.com; contact=)" —— 看着像来源, 实际解析不到任何东西。
+     * GitHub 对匿名 API 请求明确希望 UA 带可解析的出处, 版本号也取自 Bootstrap::VERSION,
+     * 免得发版后 UA 里还写着旧版本。
+     */
+    private function userAgent(): string
+    {
+        $explicit = trim($this->cfg->str('app.user_agent', ''));
+        if ($explicit !== '') {
+            return $explicit;
+        }
+
+        $ua = 'GhAccel/' . Bootstrap::VERSION;
+        $bits = [];
+        $repo = trim($this->cfg->str('app.repo_url', ''));
+        if ($repo !== '' && preg_match('#\Ahttps://[a-z0-9.\-]+(/[^\s;]*)?\z#i', $repo) === 1) {
+            $bits[] = '+' . rtrim($repo, '/');
+        }
+        $contact = trim($this->cfg->str('app.contact', ''));
+        if ($contact !== '') {
+            $bits[] = 'contact=' . $contact;
+        }
+        if ($bits !== []) {
+            $ua .= ' (' . implode('; ', $bits) . ')';
+        }
+
+        return $ua;
     }
 
     // ------------------------------------------------------------------

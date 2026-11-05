@@ -19,10 +19,15 @@ return [
         // 同源基准。CSRF/Origin 校验严格等值比这个值, 绝不用 $_SERVER['HTTP_HOST'],
         // 因为 Host 头可伪造, 宝塔直通 $http_host 且 server_name 宽松时会导致校验被绕过。
         'base_origin'        => '',
-        'repo_url'           => '',
+        // 上游项目地址。它同时是发往 GitHub 的 UA 里的出处标识, 因此必须是能解析到的真实
+        // URL; 派生/fork 建议改成自己的仓库地址, 免得 API 侧把配额与滥用判定记到上游头上。
+        'repo_url'           => 'https://github.com/XINYUCloud/ghaccel',
+        // 出问题时可联系你的地址(邮箱或任意标识), 留空则不出现在 UA 里。
         'contact'            => '',
         // 面向 GitHub 的 UA 标识。匿名 API 有速率限制且要求可识别来源, 不伪装浏览器 UA。
-        'user_agent'         => 'GhAccel/1.0 (+https://github.com; contact=)',
+        // 留空即由 Transport\Headers 按 "GhAccel/<Bootstrap::VERSION> (+repo_url; contact=…)"
+        // 现组合; 需要自定义时才填完整字符串(填了就不再拼接, 版本号也不会自动跟随)。
+        'user_agent'         => '',
         // 部署定位: private 表示自用, 默认不公网开面板、EDGE 保守。
         'exposure'           => 'private',
     ],

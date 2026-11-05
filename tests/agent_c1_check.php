@@ -277,6 +277,33 @@ ok(!str_contains($low, 'cookie:') && !str_contains($low, 'authorization:') && !s
     '请求方向剥离 Cookie/Authorization/Referer/X-Forwarded-*(默认不把用户 token 送给第三方镜像)');
 ok(str_contains($joined, 'Accept-Encoding: identity') && str_contains($joined, 'User-Agent: GhAccel'),
     '流式场景强制 identity(解压会让长度与校验全错)并注入配置的 User-Agent');
+
+// UA 必须含可解析出处, 且版本号取自 Bootstrap::VERSION。
+// 上面那条只查 "User-Agent: GhAccel" —— 旧的半截默认值 "GhAccel/1.0 (+https://github.com; contact=)"
+// 同样能通过, 所以它压根没锁住任何东西。漂移的原因从来是没断言, 不是没人看见。
+$uaLine = '';
+foreach ($lines as $l) {
+    if (stripos($l, 'user-agent') === 0) {
+        $uaLine = trim($l);
+    }
+}
+$wantUa = 'User-Agent: GhAccel/' . GhAccel\Bootstrap::VERSION;
+$repoUrl = trim($cfg->str('app.repo_url', ''));
+ok(str_starts_with($uaLine, $wantUa), 'UA 版本跟随 Bootstrap::VERSION 而不是写死的旧号', $uaLine);
+ok($repoUrl !== '' && str_contains($uaLine, $repoUrl), 'app.repo_url 确实被 UA 消费(防它重新变成死配置)', $repoUrl);
+ok(!str_contains($uaLine, 'github.com;') && !preg_match('#\+https://github\.com[);]#', $uaLine),
+    'UA 里没有只到域名就断掉的半截出处', $uaLine);
+$uaOverrideDir = $WORK . '/override';
+@mkdir($uaOverrideDir . '/config', 0770, true);
+file_put_contents($uaOverrideDir . '/config/config.dist.php',
+    "<?php\nreturn ['app' => ['repo_url' => 'https://github.com/XINYUCloud/ghaccel',"
+    . "'user_agent' => 'ProbeCorp/9.9 (+https://probe.example)']];\n");
+$uaOverride = Config::load($uaOverrideDir, true);
+ok(str_contains(implode('|', (new GhAccel\Transport\Headers($uaOverride, $policy))->requestLines($refRaw, [])),
+    'User-Agent: ProbeCorp/9.9 (+https://probe.example)'),
+    '显式 app.user_agent 原样生效且不再拼接', 'override');
+// 把单例还原成本套件一开始加载的那份(ROOT 的真实配置), 否则后面所有隐式 load 都拿到空配置
+Config::load(ROOT, true);
 ok(in_array('Range: bytes=0-63', $lines, true) && !str_contains($low, 'host:'),
     '客户端 Range 逐字节原样转发; Host 交回 curl 按 URL 生成');
 
