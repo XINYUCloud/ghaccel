@@ -53,3 +53,6 @@ desktop.ini
 
 # ---- 本地日志与崩溃转储 ----
 *.log
+
+# 发布构建输出目录(build-release 脚本的产物), 不入库
+/dist/
