@@ -1,0 +1,54 @@
+# =====================================================================
+# GhAccel — .editorconfig
+# 代码是 4 空格缩进、LF、UTF-8、结尾换行的 PHP; 这里把这套约定固化给任何编辑器。
+# =====================================================================
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+
+# ---- PHP: 与 src/ 现有文件逐字一致的缩进口径 ----
+[*.php]
+indent_style = space
+indent_size = 4
+
+# ---- 配置文件(php 数组形态) ----
+[config/*.php]
+indent_style = space
+indent_size = 4
+
+# ---- 部署与服务器配置 ----
+[.htaccess]
+indent_style = space
+indent_size = 4
+
+[deploy/*.conf]
+indent_style = space
+indent_size = 4
+
+# ---- 前端资源: 面板 css/js 由并行交付提供, 统一 2 空格 ----
+[public/panel/assets/*.css]
+indent_size = 2
+
+[public/panel/assets/*.js]
+indent_size = 2
+
+[*.{html,htm}]
+indent_size = 2
+
+[*.{json,jsonld}]
+indent_size = 2
+
+# ---- Markdown: 行尾两空格是换行语义, 不能裁 ----
+[*.md]
+trim_trailing_whitespace = false
+max_line_length = off
+
+# ---- 补丁与锁定文件 ----
+[*.lock]
+indent_size = off

@@ -1,0 +1,75 @@
+# =====================================================================
+# GhAccel — Apache 部署 (.htaccess)
+#
+# 放置位置: 这份文件要落在**站点实际文档根**里。宝塔「运行目录」设成 /public 时,
+#           把它复制到 public/.htaccess(仓库根这份用于源码分发与 git 跟踪)。
+# 前置: 需要 mod_rewrite 与 mod_headers; AllowOverride 至少 FileInfo Options。
+#
+# 与 nginx 侧的关键差异(务必知道):
+#   - Apache **不会**折叠 URL 里的 `//` —— 这是好事, 绝对形式入口 /https://... 能原样到 PHP。
+#   - AllowEncodedSlashes 默认 Off: `%2f` 会在到达 PHP 前被判 404。而我们本来就要拒 `%2f`
+#     (RefParser/UrlGuard 对 host 含百分号编码一律拒绝), 所以默认行为正好, **不要**改 On。
+# =====================================================================
+
+# 关闭目录索引与 MultiViews(后者会把 /gh 去模糊匹配成 /gh.php 之类的真实文件, 破坏表面互斥路由)。
+Options -Indexes -MultiViews +FollowSymLinks
+
+DirectoryIndex index.php
+
+# ---- 危险目录一律 403: var(缓存/状态/密钥)、src(源码)、config(含 token 的本地配置)、bin(运维脚本) ----
+# 与 nginx 的 `location ^~ /var/ { deny all; }` 同一意图, 是纵深防御的第二层。
+# 真正的硬防线是入口锁定只执行 index.php(见下 RewriteRule), 这条只是让探测者更早吃到 403。
+RewriteEngine On
+RewriteBase /
+
+# 先于一切改写: 直接拒绝访问这些前缀下的任何路径。
+RewriteRule ^(var|src|config|bin)/ - [F,L]
+
+# 面板静态资源(若并行交付已落地)真实存在就直接给文件, 不进代理链。
+# 不存在时落到下面的 index.php, 由表面分发判成 panel/assets。
+RewriteCond %{REQUEST_FILENAME} -f
+RewriteRule ^(panel/assets/.*)$ - [L]
+
+# ---- 前端控制器: 除真实静态文件外, 全部交给 public/index.php 接管 ----
+# 关键: 绝不按 URI 去拼文件路径执行, 只固定到 index.php —— 这是"缓存目录被写入后还能不能被
+# 当 PHP 执行"的真正答案(等价 nginx 的 SCRIPT_FILENAME 锁定)。
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^ index.php [L,QSA]
+
+# =====================================================================
+# 禁止在本文件写任何 php_value / php_flag!
+# 宝塔用 php-fpm 跑 PHP 时, .htaccess 里的 php_value/php_flag 会直接 500
+# (php_value 只在 mod_php / php_admin_value 场景有效)。zlib.output_compression、
+# cgi.fix_pathinfo、expose_php 这三项必须改 php.ini(或宝塔的"PHP 设置→配置修改"),
+# 不能在这里设。见 README 与 deploy/bt-panel.md 的破坏后果说明。
+# =====================================================================
+
+# =====================================================================
+# 安全响应头(全站)。Content-Security-Policy 的严格版本由首页与面板各自按表面下发,
+# 这里补一层兜底, 覆盖任何静态回退路径。
+# =====================================================================
+<IfModule mod_headers.c>
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set X-Frame-Options "DENY"
+    Header always set Referrer-Policy "no-referrer"
+    Header always set Permissions-Policy "camera=(), microphone=(), geolocation=()"
+    Header always set Content-Security-Policy "default-src 'self'; script-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'"
+    # 关服务器指纹: 不给扫描器"这是 Apache+PHP"的额外信号(与 expose_php=Off 配合)。
+    Header always unset X-Powered-By
+    Header always unset Server
+    # 大文件下载走流式: 关掉 Apache 侧对响应的压缩缓冲改写, 避免 Content-Length 与实际字节不符。
+    # (setoutputfilter 若与 mod_deflate 冲突会破字节流, 这里显式不套 gzip 过滤器。)
+    SetOutputFilter DeFlate
+</IfModule>
+
+# 禁访问隐藏文件(.gitignore/.editorconfig/.git 等)。
+<FilesMatch "^\.">
+    Require all denied
+</FilesMatch>
+
+# 禁访问源码与配置本体(即便被上面的 RewriteRule 漏过, 文件级再兜一层)。
+<FilesMatch "\.(php\|dist\|md\|json)$">
+    # config/dist/sources 的 php 直接 403; index.php 与 panel.php 由运行目录暴露, 不在此路径。
+    Require all denied
+</FilesMatch>

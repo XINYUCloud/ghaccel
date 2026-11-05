@@ -1,0 +1,55 @@
+# =====================================================================
+# GhAccel — .gitignore
+# 原则: 配置覆盖层、运行期数据、密钥、临时产物一律不入库; 目录靠各级 .gitkeep 保结构。
+# =====================================================================
+
+# ---- 本地配置(含 base_origin / 自建源域名 / 可能的 token)绝不入库 ----
+# 出厂模板 config/config.dist.php 与起步模板 config/config.example.php 要跟踪。
+/config/config.php
+/config/config.local.php
+/config/sources.php
+/config/sources.local.php
+
+# 部署者自带的 CA bundle(体积大、环境相关, 不入库)
+/config/cacert.pem
+
+# ---- 运行期数据: var/ 下除各级 .gitkeep 外全部忽略 ----
+# 注意: 先放开目录本身(!var/**/)才能重新纳入其内的 .gitkeep, 顺序不可换。
+/var/**
+!/var/**/
+!/var/**/.gitkeep
+
+# 测试脚本与自检产生的临时目录 / 快照 / 日志
+/var/_agent_a_check/
+/var/_agent_b_check/
+/var/_agent_c1_check/
+/var/_selftest/
+
+# ---- 状态与缓存的散落产物(即便上面已忽略, 再显式列出便于人工核对)----
+*.tmp
+*.part
+*.ndjson
+.snap.*.json
+
+# ---- 依赖与构建产物(本项目零 Composer 运行时依赖; 若有人临时 composer install)----
+/vendor/
+composer.lock
+/.phpunit.result.cache
+/.phpunit.cache/
+
+# 发布包是构建产物, 应挂到 GitHub Release 附件上, 不进源码仓库:
+# 提交它会让每次重新打包都产生一个二进制 diff, 而 git 对 zip 无法增量压缩。
+/GhAccel-*.zip
+
+# ---- 编辑器 / 操作系统 ----
+/.idea/
+/.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ---- 本地日志与崩溃转储 ----
+*.log
